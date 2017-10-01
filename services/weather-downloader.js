@@ -1,4 +1,6 @@
-var config = rootRequire('config');
+var apiConfig = rootRequire('config/api-config');
+var timingConfig = rootRequire('config/timing-config');
+var dateFormat = require('date-fns/format');
 // TODO: var sqlite = require('sql.js');
 
 // Init db
@@ -7,28 +9,32 @@ var config = rootRequire('config');
 // Init DarkSky
 var DarkSky = require('forecast.io');
 var darksky = new DarkSky({
-  APIKey: config.darksky.api_key,
+  APIKey: apiConfig.darksky.api_key,
   timeout: 1000
 });
 
 module.exports = {};
 
 module.exports.startDownloadSchedule = function() {
-  var millisBetweenQueries = config.minutesBetweenQueries * 60 * 1000;
+  var millisBetweenQueries = timingConfig.minutesBetweenQueries * 60 * 1000;
   setInterval(downloadForecasts, millisBetweenQueries);
+  downloadForecasts();
 };
 
 function downloadForecast(location, forecastTime) {
-	// TODO: Time
-	darksky.get(location.lat, location.lon, function (err, res, data) {
-    if (err) {
-    	throw err;
-    }
-    console.log('res: ' + JSON.stringify(res));
-    console.log('data: ' + JSON.stringify(data));
+	console.log('Downloading ' + JSON.stringify(location) + ' for ' + commonFormatDate(forecastTime));
 
-    // TODO: Save to DB
-  	saveForecastResponseToDatabase(location, forecastTime, data);
+	throw 'Not yet implemented: Save to DB';
+	
+	darksky.get(location.lat, location.lon, function (err, res, data) {
+		if (err) {
+			throw err;
+		}
+		console.log('res: ' + JSON.stringify(res));
+		console.log('data: ' + JSON.stringify(data));
+
+		// TODO: Save to DB
+		saveForecastResponseToDatabase(location, forecastTime, data);
 	});
 }
 
@@ -37,11 +43,11 @@ function saveForecastResponseToDatabase(location, forecastTime, data) {
 }
 
 function insideAnyQueryPeriod() {
-	for (var i = 0; i < config.queryPeriods.length; i++) {
-		var queryPeriod = config.queryPeriods[i];
-		// TODO: var startTime = moment(queryPeriod.start);
-		// TODO: var endTime = moment(queryPeriod.end);
-		if (moment() >= startTime && moment() <= endTime) {
+	var queryPeriods = timingConfig.getQueryPeriods();
+	var now = new Date();
+	for (var i = 0; i < queryPeriods.length; i++) {
+		var queryPeriod = queryPeriods[i];
+		if (now >= queryPeriod.start && now <= queryPeriod.end) {
 			return true;
 		}
 	}
@@ -52,10 +58,15 @@ function downloadForecasts() {
 	if (!insideAnyQueryPeriod()) {
 		return;
 	}
-	config.forecastTimes.forEach(function (forecastTimeString) {
-		// TODO: var forecastTime = moment(forecastTimeString);
-		config.locations.forEach(function(location) {
+
+	var forecastTimes = timingConfig.getForecastTimes();
+	forecastTimes.forEach(function (forecastTime) {
+		apiConfig.darksky.locations.forEach(function(location) {
 			downloadForecast(location, forecastTime);
 		});
 	});
+}
+
+function commonFormatDate(date) {
+	return dateFormat(date, 'MM/DD/YYYY HH:mm');
 }
