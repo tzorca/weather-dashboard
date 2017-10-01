@@ -19,6 +19,6 @@
     "node-pre-gyp": "^0.6.38",
     "nodemon": "~1.12.1",
     "serve-favicon": "^2.3.2",
-    "sql.js": "^0.4.0"
+    "sqlite3": "^3.1.13"
   }
 }

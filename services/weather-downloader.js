@@ -1,10 +1,11 @@
 var apiConfig = rootRequire('config/api-config');
 var timingConfig = rootRequire('config/timing-config');
 var dateFormat = require('date-fns/format');
-// TODO: var sqlite = require('sql.js');
+var fs = require('fs');
 
-// Init db
-// TODO: var db = sqlite.connect('./db/todo-sql.db');
+// Load SQLite database
+var sqlite3 = require('sqlite3').verbose();
+var db = new sqlite3.Database(rootPath('db/weather-data.sqlite'));
 
 // Init DarkSky
 var DarkSky = require('forecast.io');
@@ -24,22 +25,33 @@ module.exports.startDownloadSchedule = function() {
 function downloadForecast(location, forecastTime) {
 	console.log('Downloading ' + JSON.stringify(location) + ' for ' + commonFormatDate(forecastTime));
 
-	throw 'Not yet implemented: Save to DB';
-	
-	darksky.get(location.lat, location.lon, function (err, res, data) {
+	var unixForecastTime = Math.floor(forecastTime.getTime()/1000);
+	darksky.getAtTime(location.lat, location.lon, unixForecastTime, function (err, res, data) {
 		if (err) {
 			throw err;
 		}
-		console.log('res: ' + JSON.stringify(res));
-		console.log('data: ' + JSON.stringify(data));
-
-		// TODO: Save to DB
-		saveForecastResponseToDatabase(location, forecastTime, data);
+		var dataJson = JSON.stringify(data);
+		console.log('data: ' + dataJson);
+		
+		saveForecastResponseToDatabase(location, forecastTime, dataJson);
 	});
 }
 
-function saveForecastResponseToDatabase(location, forecastTime, data) {
-	// TODO: Save to Sqlite DB
+function saveForecastResponseToDatabase(location, forecastTime, dataJson) {
+	db.serialize(function() {
+		var statement = "INSERT INTO QueryResponse (DateQueried, ForecastTime, ForecastLatitude, ForecastLongitude, ResponseJson) VALUES ($dateQueried, $forecastTime, $forecastLatitude, $forecastLongitude, $responseJson)";
+
+		db.run(statement, {
+			$dateQueried: commonFormatDate(new Date()),
+			$forecastTime: commonFormatDate(forecastTime),
+			$forecastLatitude: location.lat,
+			$forecastLongitude: location.lon,
+			$responseJson: dataJson
+		}, function(err) {
+			console.log('Recorded forecast to DB.');
+		});
+		
+	});
 }
 
 function insideAnyQueryPeriod() {
@@ -60,13 +72,14 @@ function downloadForecasts() {
 	}
 
 	var forecastTimes = timingConfig.getForecastTimes();
-	forecastTimes.forEach(function (forecastTime) {
+	forecastTimes.every(function (forecastTime) {
 		apiConfig.darksky.locations.forEach(function(location) {
 			downloadForecast(location, forecastTime);
 		});
+		return false; // break - just query one forecast time for now
 	});
 }
 
 function commonFormatDate(date) {
-	return dateFormat(date, 'MM/DD/YYYY HH:mm');
+	return dateFormat(date, 'MM/DD/YYYY HH:mm:ss');
 }

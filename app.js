@@ -4,9 +4,14 @@ var favicon = require('serve-favicon');
 var logger = require('morgan');
 var cookieParser = require('cookie-parser');
 var bodyParser = require('body-parser');
-global.rootRequire = function(name) {
-  return require(__dirname + '/' + name);
+global.rootPath = function(name) {
+  return __dirname + '/' + name;
 }
+global.rootRequire = function(name) {
+  return require(rootPath(name));
+}
+
+
 
 var weatherDownloader = require('./services/weather-downloader');
 weatherDownloader.startDownloadSchedule({minutesBetweenDownloads:0.25});
